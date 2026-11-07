@@ -1,0 +1,8 @@
+# Synthetic dimensions; explicit length strings retain live parameter references.
+track: 12um
+gap: 8um
+radius: 80um
+mask_margin: 5um
+left: {position: [0um, 0um], length: 240um}
+right: {position: [2400um, 900um], length: 180um, track: 18um, gap: 5um}
+meander: {count: 3, amplitude: 180um, radius: 50um}

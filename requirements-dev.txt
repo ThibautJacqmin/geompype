@@ -1,0 +1,2 @@
+# Run from the project root; development dependencies live in pyproject.toml.
+-e .[dev]

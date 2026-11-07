@@ -1,0 +1,31 @@
+# Public files are explicit: Git exclusions alone do not protect a source archive.
+include LICENSE COPYRIGHT README.md REFERENCES.md CONTRIBUTING.md CHANGELOG.md
+include pyproject.toml setup.py requirements.txt requirements-dev.txt MANIFEST.in
+include .gitignore .editorconfig .readthedocs.yaml comsol.example.json
+include docs/*.md docs/conf.py docs/requirements.txt docs/_static/catalogue.css
+include docs/images/library/*.svg
+recursive-include examples *.py *.yaml *.yml
+recursive-include tools *.py
+recursive-include tests *.py
+recursive-include geompype/library/data *.json *.md
+recursive-include .github/workflows *.yml *.yaml
+prune private-designs
+prune geompype/circuits
+prune examples/mf008
+prune output
+prune docs/agent-memory
+prune docs/_build
+prune references
+prune .agents
+prune .codex
+prune .aws
+prune .venv
+prune .venv-ready
+prune .venv-clean
+prune .venv-docs
+exclude examples/example_mf008*.py
+exclude tests/test_mf008*.py tests/test_private*.py
+global-exclude AGENTS.md *CONTEXT*.md *context*.md
+global-exclude *.local.json *.local.toml *.local.ini *.local.cfg .env .env.*
+global-exclude *.gds *.gdsii *.GDS *.GDSII *.oas *.oasis *.mph *.MPH *.mph.* *.mphbin *.mphtxt *.mphlog *.mphlock
+global-exclude *.py[cod] __pycache__ *.log *.pem *.key *.pfx *.p12

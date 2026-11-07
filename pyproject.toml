@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "geompype"
+version = "0.1.0"
+description = "One Python-scripted geometry for both COMSOL simulations and lithography GDS masks."
+readme = "README.md"
+authors = [{name = "Thibaut Jacqmin"}]
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE", "COPYRIGHT"]
+requires-python = ">=3.10"
+keywords = ["geometry", "COMSOL", "KLayout", "GDS", "lithography", "nanofabrication"]
+dynamic = ["dependencies"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering",
+]
+
+[project.optional-dependencies]
+dev = ["build>=1.2,<2", "setuptools>=77", "wheel>=0.45"]
+
+[tool.setuptools]
+packages = ["geompype", "geompype.library"]
+include-package-data = false
+
+[tool.setuptools.package-data]
+"geompype.library" = ["data/*.json", "data/README.md"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}

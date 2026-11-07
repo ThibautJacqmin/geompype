@@ -1,0 +1,36 @@
+name: Python checks
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.10", "3.12"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m pip check
+      - run: python -m unittest discover -s tests -v
+      - run: python tools/check_distribution.py
+
+  docs:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r docs/requirements.txt
+      - run: python -m sphinx -b html -W --keep-going docs output/docs/html

@@ -1,0 +1,4 @@
+# Documentation only; no GeomPype installation or COMSOL runtime is needed.
+Sphinx==9.1.1
+myst-parser==5.1.0
+sphinx-rtd-theme==3.1.0

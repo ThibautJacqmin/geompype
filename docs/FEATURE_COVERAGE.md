@@ -25,6 +25,12 @@ The [environment guide](ENVIRONMENT.md) explains how to run the checks.
 Circuit-specific recipes can live in separately installed packages. Their
 parameters, examples and tests belong with those packages.
 
+The [parameter guide](guide.md#yaml-parameters) covers direct registration from
+flat YAML files. `Project.add_parameter` also accepts a single named parameter,
+a list/tuple of existing parameters, or a dictionary. `ComsolParameter` retains
+native COMSOL units and formulas; these definitions cannot drive GDS geometry.
+The existing `load_config` API handles hierarchical YAML with includes and variants.
+
 Library elements each have a module in [geompype/library](../geompype/library/__init__.py).
 Mark dimensions can retain Parameters. Wafer outline options are fixed at
 construction; their placement and scaling can retain Parameters. The 4-inch

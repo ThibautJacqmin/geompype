@@ -6,6 +6,16 @@ whether a property is available in another version. Page numbers below are
 those printed in the manuals. Local manuals are optional and are included in
 neither the package nor its distributions.
 
+## COMSOL geometry kernel
+
+The [COMSOL 6.4 geometry API](https://doc.comsol.com/6.4/doc/com.comsol.help.comsol/comsol_api_general.47.35.html)
+documents `geomRep("comsol")` for the built-in kernel and `cadps` for the CAD
+kernel, which requires the CAD Import Module. GeomPype sets `comsol` on each
+new 3D geometry before creating its WorkPlanes; it does not change COMSOL's
+global preferences. This avoids inheriting a CAD requirement at Form Union.
+The [licence error guide](https://www.comsol.com/support/knowledgebase/1059)
+explains that error `-4` means the requested product's seats are occupied.
+
 ## Curves and grid
 
 [examples/example_curved_tracks.py](./examples/example_curved_tracks.py) uses an open
@@ -315,8 +325,11 @@ inclination of the DPath end cap.
 
 The library retains named profiles, signed offsets, reversed ports, linear
 tapers, oriented waypoints, meanders and line/arc lengths.
-YAML import uses PyYAML.safe_load, with explicit includes, inheritance and
-variants; it does not instantiate drawing classes automatically.
+YAML import uses PyYAML.safe_load. The hierarchical `load_config` API provides
+explicit includes, inheritance and variants. Flat parameter files can be passed
+directly to `Project.add_parameter`, or loaded separately with `load_parameters`;
+they preserve exact names and do not expand includes. Neither loader instantiates
+drawing classes or evaluates expression strings as Python.
 
 Circuit recipes and their parameters can be maintained in a separate
 package that depends on GeomPype. The public package and its generic tests

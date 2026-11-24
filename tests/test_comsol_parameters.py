@@ -8,13 +8,72 @@ import unittest
 
 from comsol_support import get_client
 from geompype import DependentParameter, Parameter, Project, maximum, round_nearest
-from geompype.primitives import Square
+from geompype.primitives import Rectangle, Square
 from geompype.transforms import Rotate
 
 
 @unittest.skipUnless(os.environ.get("GEOMPYPE_TEST_COMSOL") == "1",
                      "Set GEOMPYPE_TEST_COMSOL=1 to use the COMSOL server.")
 class TestComsolParameters(unittest.TestCase):
+    def test_mapping_native_units_geometry_rebuild_and_saved_readback(self):
+        client = get_client()
+        with TemporaryDirectory() as folder:
+            project = Project(client=client, output=Path(folder) / "mapped_parameters")
+            layer = project.add_layer("surface", gds=False)
+            group = project.add_selection("surface_domain")
+            values = project.add_parameter({
+                "width": "6um",
+                "height": "9[um]",
+                "pressure": "3[MPa]",
+                "inverse_length": "2[1/um]",
+                "normalized_load": "pressure/(1[MPa])*width/(1[um])",
+                "width_factor": "inverse_length*width",
+            })
+            rectangle = Rectangle(project, layer=layer,
+                                  size=(values["width"], values["height"]),
+                                  base="corner", selections=[group])
+
+            def check_model(model, width, pressure):
+                from jpype import JArray, JInt
+
+                parameters = model.java.param()
+                self.assertEqual(set(str(name) for name in parameters.varnames()),
+                                 set(values))
+                for name, value in values.items():
+                    self.assertEqual(str(parameters.get(name)), value.definition)
+                self.assertAlmostEqual(parameters.evaluate("pressure"), pressure * 1e6)
+                self.assertAlmostEqual(parameters.evaluate("normalized_load"), pressure * width)
+                self.assertAlmostEqual(parameters.evaluate("width_factor"), 2 * width)
+                component = model.java.component("comp1")
+                geometry = component.geom("geom1")
+                feature = geometry.feature(project.default_workplane.tag).geom().feature(rectangle.tag)
+                self.assertEqual(str(feature.getType()), "Rectangle")
+                self.assertEqual(list(feature.getStringArray("size")), ["width", "height"])
+                selection = component.selection(group.tag)
+                self.assertEqual(len(selection.entities()), 1)
+                measure = geometry.measureFinal()
+                measure.selection().geom(JInt(2))
+                measure.selection().set(JArray(JInt)(list(selection.entities())))
+                self.assertAlmostEqual(measure.getArea(), width * 9, delta=0.001)
+                for actual, expected in zip(measure.getBoundingBox(), (0, width, 0, 9, 0, 0)):
+                    self.assertAlmostEqual(actual, expected, delta=0.00001)
+
+            try:
+                project.build()
+                check_model(project.model, 6, 3)
+                values["width"].value = 10
+                values["pressure"].expression = "5[MPa]"
+                project.build()
+                check_model(project.model, 10, 5)
+                saved = client.load(str(project.mph_path))
+                try:
+                    check_model(saved, 10, 5)
+                finally:
+                    client.remove(saved)
+            finally:
+                if project.model is not None:
+                    client.remove(project.model)
+
     def test_round_max_and_explicit_registration(self):
         client = get_client()
         with TemporaryDirectory() as folder:

@@ -57,3 +57,18 @@ settings and must remain in its interactive interpreter after testing.
 GUI executable paths are separate, explicit display options:
 `project.show(comsol_exe=..., klayout_exe=...)`. See
 [ENVIRONMENT.md](ENVIRONMENT.md) for installation and test commands.
+
+## Geometry kernel
+
+New projects explicitly select the built-in COMSOL geometry kernel with
+`geomRep("comsol")`. Their planar geometry does not require the CAD Import
+Module. This setting belongs to the new model; GeomPype does not change the
+server's default kernel, saved preferences or other models.
+
+Older generated models may have inherited the CAD kernel (`cadps`) from COMSOL
+preferences. This can request a CAD Import licence at the final 3D Form Union,
+even when the WorkPlane contains only a rectangle. Rebuild the script with the
+updated GeomPype code. For an existing generated model in COMSOL Desktop,
+select **Geometry 1 > Geometry representation > COMSOL kernel**, then rebuild.
+Error `-4` means all seats for the requested product are occupied; it does not
+mean the planar drawing needs that product.

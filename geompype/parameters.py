@@ -181,6 +181,40 @@ class Parameter(_Scalar):
         return f"{self.value:.17g}{suffix}"
 
 
+class ComsolParameter:
+    """A named expression evaluated only by COMSOL, never by Python or GDS.
+
+    Use for units or formulas outside the geometry arithmetic, for example
+    ``ComsolParameter('200[GPa]', 'modulus')``. Register it with
+    ``project.add_parameter()``. Edit ``expression`` and call ``build()`` to
+    update the model. COMSOL validates its units and expression at native use.
+    This object cannot be used as a geometry dimension or in Python arithmetic.
+    """
+
+    def __init__(self, expression, name, *, description=""):
+        self._name = _name(name)
+        self.description = str(description)
+        self.expression = expression
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def expression(self):
+        return self._expression
+
+    @expression.setter
+    def expression(self, expression):
+        if not isinstance(expression, str) or not expression.strip():
+            raise ValueError("A COMSOL parameter expression must be a nonempty string.")
+        self._expression = expression
+
+    @property
+    def definition(self):
+        return self.expression
+
+
 class DependentParameter(_Scalar):
     """Name an expression, e.g. ``DependentParameter(width + 2*gap, 'pitch')``.
 
@@ -234,6 +268,29 @@ class DependentParameter(_Scalar):
         return _expression_text(self.expression)
 
 
+def _named_parameter(name, value):
+    """Normalize a dictionary entry without interpreting formula strings."""
+    _name(name)
+    if isinstance(value, (Parameter, DependentParameter, ComsolParameter)):
+        if value.name != name:
+            raise ValueError(f"Dictionary key {name!r} must match parameter name {value.name!r}.")
+        return value
+    if isinstance(value, str):
+        # Only numeric literals and the existing geometry units are converted.
+        # All formulas and other units are left for COMSOL to interpret.
+        number = r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?"
+        unit = r"nm|um|µm|μm|mm|m|deg|rad|1"
+        match = re.fullmatch(
+            rf"\s*({number})\s*(?:\[\s*({unit})\s*\]|({unit}))?\s*", value
+        )
+        if match:
+            return Parameter(float(match[1]), name, unit=match[2] or match[3] or "")
+        return ComsolParameter(value, name)
+    if isinstance(value, Real):
+        return Parameter(value, name)
+    raise TypeError(f"Parameter {name!r} requires a named parameter, number or expression string.")
+
+
 def _literal_zero(value):
     # A named zero can change later, so only a literal zero is unit-neutral.
     return not isinstance(value, _Scalar) and value == 0
@@ -241,6 +298,11 @@ def _literal_zero(value):
 
 def _quantity(value, active):
     """Return a current numerical value in um/deg and its dimensions."""
+    if isinstance(value, ComsolParameter):
+        raise ValueError(
+            f"Parameter {value.name!r} is evaluated only by COMSOL; "
+            "it cannot be used in geometry or Python parameter arithmetic."
+        )
     if not isinstance(value, _Scalar):
         return _number(value), (0, 0)
     if value in active:
@@ -342,7 +404,7 @@ def collect_parameters(values):
     visited = set()
 
     def visit(value):
-        if not isinstance(value, _Scalar):
+        if not isinstance(value, (_Scalar, ComsolParameter)):
             _number(value)
             return
         if value in active:

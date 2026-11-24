@@ -1,6 +1,9 @@
-"""Read hierarchical YAML with includes, inherited values and explicit variants.
+"""Read flat parameter files or hierarchical YAML configurations.
 
-Referenced YAML files are resolved against the main YAML file's directory.
+``load_parameters`` preserves exact names and returns named parameter objects
+from a flat YAML mapping. It does not expand includes or evaluate expressions.
+
+With ``load_config``, referenced YAML files are resolved against the main file's directory.
 Component dictionaries inherit missing values from their parent. ``name__0``
 entries override independent copies of ``name``; dotted override keys are
 supported. Explicit length/angle strings become live named Parameters. Counts,
@@ -13,9 +16,32 @@ from copy import deepcopy
 from pathlib import Path
 import re
 
-from .parameters import Parameter
+from .parameters import Parameter, _named_parameter
 
 _QUANTITY = re.compile(r"^\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s*(nm|um|µm|μm|mm|m|deg|rad)\s*$")
+
+
+def load_parameters(path):
+    """Read a flat YAML file into a dictionary of named parameter objects.
+
+    Accept a filename or Path. Names are preserved without a prefix. Numbers
+    and length/angle literals become Parameters; other strings become
+    ComsolParameters whose expressions are evaluated only by COMSOL.
+    To load and register in one step, use ``project.add_parameter('parameters.yaml')``.
+    This standalone helper only loads; it does not register, build or connect.
+
+    The file must contain a flat mapping, including an empty ``{}`` if needed.
+    Nested scopes, lists and booleans are not parameter definitions. Includes
+    and name prefixes belong to ``load_config``, not this loader.
+    """
+    import yaml
+
+    path = Path(path)
+    with path.open(encoding="utf-8-sig") as stream:
+        data = yaml.safe_load(stream)
+    if not isinstance(data, dict):
+        raise ValueError(f"Parameter file {path} must contain a flat mapping.")
+    return {name: _named_parameter(name, value) for name, value in data.items()}
 
 
 def _merge(base, override):

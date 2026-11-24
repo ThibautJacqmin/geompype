@@ -26,6 +26,8 @@ combined in the same graph. Multiple planar drawings can be placed in
 separate COMSOL WorkPlanes. Operations between layers stay within their
 WorkPlane; a selection can span several planes.
 The project generates geometry without creating physics, meshes or studies.
+New COMSOL geometries explicitly use the built-in COMSOL kernel, so these
+planar drawings do not require the CAD Import Module.
 
 In COMSOL, geometry always belongs to a **3D component**:
 
@@ -620,6 +622,58 @@ use `project.add_parameter(parameter)`. Its dependencies are included too.
 Registration triggers neither a connection nor a build, even in live mode;
 `build()` exports its definition as soon as a COMSOL layer is enabled.
 
+For several existing parameters, pass a list or tuple. Their names are already
+stored in the objects:
+
+```python
+parameters = project.add_parameter([width, gap, angle, pitch])
+```
+
+The returned dictionary uses those names as keys and retains the same objects.
+Dependencies are registered automatically. Repeating the same object is allowed;
+distinct objects with the same name are rejected before any registration.
+List and tuple entries must be named parameter objects.
+
+You can also register a dictionary in one call. Keys are the exact parameter names;
+values may be existing named parameters, numbers, or expression strings:
+
+```python
+parameters = project.add_parameter({
+    "width": width,                  # Reuse the existing object.
+    "count": 4,                      # A dimensionless Parameter.
+    "film_thickness": "80[nm]",      # A length Parameter.
+    "modulus": "200[GPa]",           # A COMSOL-only parameter.
+    "ratio": "film_thickness/width", # A formula evaluated only by COMSOL.
+})
+```
+
+The returned dictionary contains `Parameter`, `DependentParameter` or
+`ComsolParameter` objects. Numeric strings and length/angle literals such as
+`20um`, `20 um` and `20[um]` become ordinary `Parameter` objects. Other strings
+become `ComsolParameter` objects: their expressions and units are passed to
+COMSOL without Python evaluation. They cannot be used as geometry dimensions
+or in Python parameter arithmetic; use `DependentParameter` for formulas that
+must also drive GDS geometry. No physics or materials are created.
+
+Existing objects retain their identity and must have the same name as their
+dictionary key. The whole dictionary is validated before registration; a bad
+entry or a name conflict leaves the registry unchanged. Reuse the returned
+objects to register them again or share them between features.
+
+An explicit native definition is also supported:
+
+```python
+from geompype import ComsolParameter
+
+modulus = ComsolParameter("200[GPa]", "young_modulus")
+project.add_parameter(modulus)
+modulus.expression = "210[GPa]"
+project.build()
+```
+
+COMSOL checks native expressions and resolves their references when used there.
+Offline builds retain these definitions without evaluating them.
+
 In COMSOL, parameters from COMSOL layers become global parameters:
 `width = 20[um]`, `gap = 500[nm]`, `pitch = width + 2*gap`.
 The feature keeps `width` as its side and `pitch` as its position. Formulas
@@ -663,10 +717,11 @@ importable from `geompype`; unlike `round(2.5)` on an ordinary Python number,
 expressions; the ordinary Python `max` does not construct a parameterized formula.
 
 Powers `**`, functions such as `sin`, `cos` or `sqrt`, lambdas and formulas
-supplied as text are not supported in this version.
+supplied as text are not supported by the Python geometry arithmetic.
+`ComsolParameter` only passes expression text through to COMSOL.
 
-Accepted units are `nm`, `um`, `mm`, `m`, `deg`, `rad` and `""` for a dimensionless
-value. Addition converts compatible units: here, `width + 2*gap` initially
+Geometry parameters accept `nm`, `um`, `mm`, `m`, `deg`, `rad` and `""` for a
+dimensionless value. Addition converts compatible units: here, `width + 2*gap` initially
 equals 21 µm. Adding a length to an angle or a dimensionless number is rejected;
 a literal zero is accepted. Products and quotients preserve dimensions;
 `width/gap` is dimensionless. At the geometry interface, a dimensionless number
@@ -679,9 +734,11 @@ in nm without changing its COMSOL formula. A dependent parameter's value is
 calculated and cannot be assigned; its formula can be changed with
 `pitch.expression = width + 3*gap`. Names and units are fixed.
 
-Incompatible units, circular dependencies, division by zero and non-finite
-values are rejected before export. To work offline, set `comsol=False`
-on the layers; parameter evaluation is independent of COMSOL.
+For `Parameter` and `DependentParameter`, incompatible units, circular
+dependencies, division by zero and non-finite values are rejected before export.
+To work offline, set `comsol=False` on the layers; geometry parameter evaluation
+is independent of COMSOL. `ComsolParameter` expressions remain opaque in Python
+and are checked and evaluated by COMSOL when used there.
 
 ## Corners, offsets and planar thickening
 
@@ -1012,8 +1069,46 @@ transforms those curves.
 
 ## YAML parameters
 
-`load_config('parameters.yaml', name='sample')` reads YAML files with PyYAML,
-without importing a drawing framework or executing YAML code.
+For a flat list with exact COMSOL parameter names, pass the YAML filename
+directly to `add_parameter`:
+
+```yaml
+width: 20[um]
+height: 30[um]
+film_thickness: 80[nm]
+modulus: 200[GPa]
+ratio: film_thickness/width
+```
+
+```python
+from geompype import Project, Rectangle
+
+project = Project(output="output/yaml_rectangle")
+parameters = project.add_parameter("parameters.yaml")
+layer = project.add_layer("outline")
+rectangle = Rectangle(project, layer=layer,
+                      size=(parameters["width"], parameters["height"]))
+project.build()
+project.show()
+```
+
+Edit the YAML and rerun the script, or change `parameters['width'].value` or
+`parameters['modulus'].expression` in Python and call `project.build()`.
+The filename can be a string or `Path`; relative paths use the current working
+directory. GeomPype reads UTF-8 YAML safely and returns registered parameter
+objects without adding a name prefix. The file must contain a flat mapping;
+nested configuration scopes, lists and booleans are not parameter definitions.
+Loading and registration do not trigger a build or COMSOL connection. Reuse the
+returned objects for subsequent edits; loading the file again creates new
+objects and follows the same name-conflict rules as dictionary registration.
+
+The standalone `load_parameters(path)` helper remains available when you want
+to inspect or edit parameter objects before registering them.
+
+For hierarchical recipes with includes and variants, use
+`load_config('parameters.yaml', name='sample')`. It reads YAML files with PyYAML,
+without importing a drawing framework or executing YAML code, and prefixes
+generated parameter names with the scope name (for example, `sample_track`).
 
 ```yaml
 track: 12um

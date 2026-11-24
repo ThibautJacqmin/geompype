@@ -35,6 +35,7 @@ class ComsolSquareTest(unittest.TestCase):
                         project.build()
                         project.build()  # A second call must not duplicate geometry.
                         self.assertEqual(project.geometry.getSDim(), 3)
+                        self.assertEqual(project.geometry.geomRep(), "comsol")
                         self.assertEqual(project.workplane.getType(), "WorkPlane")
                         plane = project.workplane.geom()
                         self.assertEqual(plane.getSDim(), 2)

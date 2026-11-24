@@ -1,6 +1,7 @@
 """Build the same simple objects in COMSOL and KLayout."""
 
 from copy import deepcopy
+from collections.abc import Mapping
 from math import isfinite, ulp
 from pathlib import Path
 import os
@@ -9,8 +10,10 @@ import subprocess
 
 from ._comsol import get_client
 from ._comsol_config import server_settings
+from .configuration import load_parameters
 from .layer import Layer
-from .parameters import DependentParameter, Parameter, collect_parameters
+from .parameters import (ComsolParameter, DependentParameter, Parameter,
+                         _named_parameter, collect_parameters)
 from .selection import Selection
 from .workplane import WorkPlane
 
@@ -34,6 +37,7 @@ class Project:
     Explicit arguments override these settings. An existing MPh ``client``
     bypasses them entirely. Construction validates settings without connecting;
     a COMSOL-enabled build connects when needed.
+    New geometries use the built-in COMSOL kernel, not the CAD Import kernel.
     The project never clears existing COMSOL models or stops the server.
     """
 
@@ -78,7 +82,9 @@ class Project:
         """Used and explicitly registered parameters, dependencies before dependants.
 
         The returned dictionary is rebuilt from the current object attributes.
-        Change a parameter's value, then call build(), including in live mode.
+        Change a parameter's value (or a ComsolParameter's expression), then
+        call build(), including in live mode. Native expression strings are
+        opaque: their dependencies and units are resolved by COMSOL.
         """
         return self._parameters_for(self.objects)
 
@@ -90,18 +96,53 @@ class Project:
         return collect_parameters(values)
 
     def add_parameter(self, parameter):
-        """Include a named parameter even when no geometry refers to it yet.
+        """Register named parameters, a definition dictionary, or a YAML file.
 
-        Dependencies are included too. Registration does not connect to COMSOL;
-        the definition is sent at build(), when a COMSOL layer is enabled.
+        A single Parameter, DependentParameter or ComsolParameter is returned
+        unchanged. A list or tuple accepts existing named parameters and returns
+        a dictionary using their names, without renaming or copying the objects.
+        A dictionary maps exact names to those objects, numbers or
+        strings, and returns a new dictionary of the registered objects. Numbers
+        and length/angle literals (e.g. '20 um' or '20[um]') become Parameters;
+        other strings become ComsolParameters, evaluated only by COMSOL.
+
+        A filename (string or PathLike) loads a flat YAML mapping with
+        load_parameters() and registers it in the same way. Relative filenames
+        are resolved from the current working directory. Names are preserved.
+
+        Object names must match their keys. Dependencies are included, and the
+        entire batch is checked before registration. Reuse the returned objects
+        to avoid conflicting definitions. Registration neither connects nor
+        builds, even in live mode; build() exports the definitions when a COMSOL
+        layer is enabled. Expression strings are never evaluated in Python.
         """
-        if not isinstance(parameter, (Parameter, DependentParameter)):
-            raise TypeError("add_parameter expects a named Parameter or DependentParameter.")
-        self._parameters_for(self.objects, extra=(parameter,))
-        parameter.definition  # Validate before changing the registry.
-        if parameter not in self._explicit_parameters:
-            self._explicit_parameters.append(parameter)
-        return parameter
+        if isinstance(parameter, (str, os.PathLike)):
+            parameter = load_parameters(parameter)
+        if isinstance(parameter, Mapping):
+            result = {name: _named_parameter(name, value)
+                      for name, value in parameter.items()}
+            parameters = tuple(result.values())
+        elif isinstance(parameter, (list, tuple)):
+            parameters = tuple(parameter)
+            if any(not isinstance(item, (Parameter, DependentParameter, ComsolParameter))
+                   for item in parameters):
+                raise TypeError("A parameter list or tuple must contain only named parameters.")
+            result = {item.name: item for item in parameters}
+        elif isinstance(parameter, (Parameter, DependentParameter, ComsolParameter)):
+            result = parameter
+            parameters = (parameter,)
+        else:
+            raise TypeError(
+                "add_parameter expects a named parameter, list, tuple, dictionary or YAML filename."
+            )
+        # Check the original sequence so duplicate names cannot hide conflicts.
+        self._parameters_for(self.objects, extra=parameters)
+        for item in parameters:
+            item.definition  # Validate every definition before changing the registry.
+        for item in parameters:
+            if item not in self._explicit_parameters:
+                self._explicit_parameters.append(item)
+        return result
 
     def add_workplane(self, name, *, position=(0, 0, 0), angle=0):
         """Declare an XY-parallel drawing; its placement applies only in COMSOL.
@@ -241,6 +282,8 @@ class Project:
         # Component (3D) > Geometry (3D) > Work Plane (2D) > planar features.
         component = self.model.java.component().create("comp1", True)
         self.geometry = component.geom().create("geom1", 3)
+        # Do not inherit a CAD kernel preference and request a CAD Import licence.
+        self.geometry.geomRep("comsol")
         self.geometry.lengthUnit("um")
         self.geometry.angularUnit("deg")
         self.workplane = self.geometry.create("wp1", "WorkPlane")

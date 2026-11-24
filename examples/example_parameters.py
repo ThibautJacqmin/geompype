@@ -1,25 +1,28 @@
 """Named parameters shared by COMSOL and the GDS geometry."""
 
+# %% Imports
 from geompype import Project, Parameter, DependentParameter
 from geompype.primitives import Square
 from geompype.transforms import Rotate
 
-# Parameters
+# %% Parameters
 width = Parameter(20, "width", unit="um", description="Square side")
 gap = Parameter(2, "gap", unit="um")
 angle = Parameter(45, "angle", unit="deg")
 pitch = DependentParameter(width + 2 * gap, "pitch")
 
-# Project and layer — set comsol=False to work offline
+# %% Project and layer — set comsol=False to work offline
 project = Project(output="output/example_parameters")
+# Each object already knows its name; no dictionary keys are needed.
+parameters = project.add_parameter([width, gap, angle, pitch])
 metal = project.add_layer("metal", comsol=True, gds=True)
 
-# Geometry — keep the parameter objects in dimensions, coordinates and angles
+# %% Geometry — keep the parameter objects in dimensions, coordinates and angles
 square = Square(project, layer=metal, side=width,
                 position=(pitch, 0), angle=angle)
 rotated = Rotate(square, angle=angle, keep=True)
 
-# Build and display
+# %% Build and display
 project.build()
 project.show()
 

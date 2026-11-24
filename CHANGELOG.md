@@ -16,11 +16,18 @@ and GDS masks through KLayout.
 - Ports, multiband routing profiles, tapers, oriented waypoints, meanders,
   target lengths and obstacle-clearance checks.
 - YAML parameter loading with includes, inheritance and explicit variants.
+- Parameter registration from a single named object, a list/tuple, a dictionary,
+  or a flat YAML filename, preserving parameter names and validating each batch
+  before registration. `load_parameters` also supports loading without registration.
+- `ComsolParameter` for native unit/formula definitions evaluated only by COMSOL,
+  alongside the existing geometry parameters shared with GDS.
 - Alignment marks and two-, three- and four-inch wafer outlines with one or
   two flats, each in its own library module.
 - Public demonstration scripts and their YAML parameters grouped in `examples/`.
 - Local COMSOL connection settings, offline/native checks,
   installation metadata and distribution exclusions for private/local files.
+- Explicit built-in COMSOL kernel selection for new geometries, avoiding an
+  inherited CAD kernel and unnecessary CAD Import licence requests.
 
 The [feature index](./docs/FEATURE_COVERAGE.md) identifies examples and limits.
 Geometry generation is the scope; physics, meshing and simulation studies are
